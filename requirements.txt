@@ -1,0 +1,33 @@
+--extra-index-url https://download.pytorch.org/whl/cu130
+
+# Python 3.11.14 recommended
+
+# PyTorch
+torch==2.9.1
+torchvision==0.24.1
+
+# Object detection
+ultralytics==8.4.17
+pycocotools==2.0.6
+
+# Image processing and corruptions
+numpy==1.26.4
+opencv-python==4.11.0.86
+Pillow==12.1.1
+imagecorruptions==1.1.2
+scikit-image==0.18.3
+setuptools==80.10.2
+filetype==1.2.0
+
+# Metrics
+lpips==0.1.4
+
+# Training
+wandb==0.25.0
+tqdm==4.67.3
+
+# Evaluation and analysis
+pandas==3.0.1
+scipy==1.17.1
+matplotlib==3.10.8
+seaborn==0.13.2
