@@ -2,69 +2,68 @@
 
 Official implementation of:
 
-**Novel Task-Driven Loss to Restore Object Detector Performance under Image Degradation**
+**Novel Task-Driven Loss to Restore Object Detector Performance under Image Degradation**  
 Silvia Dani, Leonardo Galteri, Marco Bertini
 
 DDSRN is a detector-agnostic network designed to estimate degradation relevant to **object detection** and to provide a differentiable task-driven loss for image restoration.
 
 The work introduces:
 
-* **Detection Degradation Score (DDS)**: a full-reference metric measuring how image degradation affects object detections.
-* **DDSRN**: a differentiable predictor trained from DDS supervision and usable as a loss without running an object detector during restoration training.
+- **Detection Degradation Score (DDS)**: a full-reference metric measuring how image degradation affects object detections.
+- **DDSRN**: a differentiable predictor trained from DDS supervision and usable as a loss without running an object detector during restoration training.
 
-> **Paper:** proceedings link will be added after publication.
+> **Paper:** proceedings link will be added once available.  
 > **Pretrained checkpoints:** [Google Drive](https://drive.google.com/drive/folders/1M0GMC2H8H3WqSJavJ2504BRt0QKYhPS8?usp=sharing)
 
 ---
 
-## Detection Degradation Score
+## 📏 Detection Degradation Score
 
 DDS compares detector predictions on a reference image and its degraded version.
 
 For a matched detection:
 
-$$
+```math
 Q_i =
-\operatorname{IoU}(D_i^{ref}, D_i^{deg})
+\mathrm{IoU}(D_i^{\mathrm{ref}}, D_i^{\mathrm{deg}})
 \cdot
-\min\left(\frac{c_i^{deg}}{c_i^{ref}},1\right)
-$$
+\min\left(
+\frac{c_i^{\mathrm{deg}}}{c_i^{\mathrm{ref}}},
+1
+\right)
+```
 
 and
 
-$$
-DDS =
+```math
+\mathrm{DDS} =
 1 -
 \frac{\sum_i Q_i}
-{\max(N_{ref},N_{deg})}.
-$$
+{\max(N_{\mathrm{ref}}, N_{\mathrm{deg}})}
+```
 
-DDS therefore accounts for localization, confidence, classification errors, missed detections, and additional detections.
+DDS accounts for localization, confidence, classification errors, missed detections, and additional detections.
 
-* **DDS = 0**: no detection degradation.
-* **DDS = 1**: maximum degradation.
+- **DDS = 0**: no detection degradation.
+- **DDS = 1**: maximum degradation.
 
 The implementation is provided in `dds_metric.py`.
 
 ---
 
-## DDSRN
+## 🧠 DDSRN
 
-DDSRN receives a reference/degraded image pair and extracts multi-scale features using a shared encoder. Differences between the two branches are combined to estimate:
+DDSRN receives a reference/degraded image pair and extracts multi-scale features using a shared encoder. Differences between the two branches are combined to estimate spatial degradation, task-relevant saliency, and a global degradation score.
 
-* a spatial degradation map;
-* task-relevant object saliency;
-* a global degradation score.
+The network operates at four feature scales with strides 4, 8, 16, and 32.
 
-The network uses four feature scales with strides 4, 8, 16, and 32.
-
-The main implementation is:
+The main implementation is provided in:
 
 ```text
 ddsrn_agnostic.py
 ```
 
-For restoration training, the intended public interface is:
+For restoration training, use:
 
 ```python
 from ddsrn_agnostic import DDSRNFeatureLoss
@@ -72,7 +71,7 @@ from ddsrn_agnostic import DDSRNFeatureLoss
 
 ---
 
-## Repository Structure
+## 📁 Repository Structure
 
 ```text
 DDSRN/
@@ -100,14 +99,13 @@ DDSRN/
 
 ---
 
-## Installation
+## ⚙️ Installation
 
 The experiments were run with **Python 3.11.14**.
 
 ```bash
 conda create -n ddsrn python=3.11.14 pip -y
 conda activate ddsrn
-
 pip install -r requirements.txt
 ```
 
@@ -115,7 +113,7 @@ The released requirements use PyTorch 2.9.1 and torchvision 0.24.1 with CUDA 13.
 
 ---
 
-# Pretrained Checkpoints
+## 📦 Pretrained Checkpoints
 
 Paper-specific checkpoints are available from:
 
@@ -133,23 +131,19 @@ checkpoints/
     └── best_model.pt
 ```
 
-### Weights used
-
-| Weights          | Use                                                     |
-| ---------------- | ------------------------------------------------------- |
-| `yolo26x.pt`     | YOLO26x initialization and DDS analysis                 |
-| `rtdetr-l.pt`    | RT-DETR-L initialization                                |
-| `yolo26ft.pt`    | Fine-tuned YOLO26x used to generate DDSRN supervision   |
+| Weights | Use |
+| --- | --- |
+| `yolo26ft.pt` | Fine-tuned YOLO26x used to generate DDSRN supervision |
 | `rtdetr-l_ft.pt` | Fine-tuned RT-DETR-L used to generate DDSRN supervision |
-| `best_model.pt`  | Trained DDSRN used as task-driven loss                  |
+| `best_model.pt` | Trained DDSRN used as task-driven loss |
 
-The original `yolo26x.pt` and `rtdetr-l.pt` weights are provided by Ultralytics.
+The original `yolo26x.pt` and `rtdetr-l.pt` weights used to initialize the detectors are provided by Ultralytics.
 
 If you only want to **use DDSRN as a loss**, the detector checkpoints are not required.
 
 ---
 
-# Using DDSRN as a Loss
+## 🛠️ Using DDSRN as a Loss
 
 Initialize the pretrained loss once:
 
@@ -163,7 +157,7 @@ ddsrn_loss = DDSRNFeatureLoss(
 )
 ```
 
-Then add it to the restoration objective:
+Then include it in the restoration objective:
 
 ```python
 restored = restoration_model(degraded)
@@ -178,29 +172,21 @@ loss.backward()
 optimizer.step()
 ```
 
-`restored` and `reference` are expected as tensors with shape
+`restored` and `reference` are expected to have shape `[B, 3, H, W]`, the same spatial resolution, and values in the `[0, 1]` range.
 
-```text
-[B, 3, H, W]
-```
-
-and values in the `[0, 1]` range.
-
-DDSRN is kept frozen, while gradients propagate through the restored image to the restoration model.
-
-No object detector is required at this stage.
+DDSRN remains frozen while gradients propagate through the restored image to the restoration model. No object detector is required at this stage.
 
 ---
 
-# Training DDSRN from Scratch
+## 🏋️ Training DDSRN from Scratch
 
 Training requires:
 
-1. the merged KITTI + VisDrone dataset;
-2. fine-tuned YOLO26x and RT-DETR-L checkpoints;
-3. DDSRN training.
+1. building the merged KITTI + VisDrone dataset;
+2. fine-tuning the detectors used for DDSRN supervision;
+3. training DDSRN.
 
-## 1. Build KITTI + VisDrone
+### 1. Build KITTI + VisDrone
 
 Run:
 
@@ -208,7 +194,7 @@ Run:
 python mergeDatasets.py
 ```
 
-The script prepares a joint KITTI + VisDrone detection dataset using their common classes and generates:
+The resulting dataset is stored under:
 
 ```text
 datasets/Kitti_Visdrone_Dataset/
@@ -219,48 +205,32 @@ datasets/Kitti_Visdrone_Dataset/
 
 Check the dataset path in `train.py` before training.
 
----
+### 2. Fine-tune the Detectors
 
-## 2. Fine-tune the Detectors
-
-The detectors used to generate DDSRN supervision can be reproduced with:
+Run:
 
 ```bash
 python finetune_detector.py
 ```
 
-The script starts from:
-
-```text
-yolo26x.pt
-rtdetr-l.pt
-```
-
-and fine-tunes both models on:
+The script fine-tunes YOLO26x and RT-DETR-L on:
 
 ```text
 datasets/Kitti_Visdrone_Dataset/kitti_visdrone.yaml
 ```
 
-The best weights are copied automatically to:
+and stores their best weights as:
 
 ```text
 checkpoints/detectors/yolo26ft.pt
 checkpoints/detectors/rtdetr-l_ft.pt
 ```
 
-These checkpoints are also available from the provided Google Drive, so this step can be skipped when using the released weights.
+These checkpoints can also be downloaded from the provided Google Drive.
 
----
+### 3. Train DDSRN
 
-## 3. Train DDSRN
-
-`dataloader.py` dynamically generates clean/degraded image pairs during training and uses the fine-tuned detector ensemble to generate:
-
-* DDS regression targets;
-* object saliency supervision.
-
-Training corruptions include the `imagecorruptions` distortions, multiple severity levels, clean samples, super-resolution degradation, and localized object/background degradation.
+`dataloader.py` dynamically generates clean/degraded image pairs and uses the fine-tuned detector ensemble to provide DDS regression targets and object-saliency supervision.
 
 Run:
 
@@ -268,7 +238,7 @@ Run:
 python train.py
 ```
 
-The best DDSRN model is saved under:
+The best checkpoint is saved as:
 
 ```text
 checkpoints/attemptAgnostic_Kitti_Visdrone_FPN_v1/best_model.pt
@@ -276,52 +246,27 @@ checkpoints/attemptAgnostic_Kitti_Visdrone_FPN_v1/best_model.pt
 
 ---
 
-# Reproducing the DDS Analysis
+## 📊 Reproducing the DDS Analysis
 
-The `helpers/` directory contains the pipeline used for the **COCO-C and VOC-C DDS experiments**:
-
-```text
-0_corrupt_images.py
-        ↓
-1_compute_metrics.py
-        ↓
-2_compute_correlations.py
-```
-
-The experiments use the 15 standard corruptions:
+The `helpers/` directory contains the pipeline used for the **COCO-C and VOC-C** DDS experiments:
 
 ```text
-gaussian_noise
-shot_noise
-impulse_noise
-defocus_blur
-glass_blur
-motion_blur
-zoom_blur
-snow
-frost
-fog
-brightness
-contrast
-elastic_transform
-pixelate
-jpeg_compression
+0_corrupt_images.py → 1_compute_metrics.py → 2_compute_correlations.py
 ```
 
-with severity levels **1–5**.
+The experiments use the 15 standard corruptions at severity levels 1–5.
 
----
+For convenience:
 
-## 0. Generate the Corrupted Datasets
+```bash
+CORRUPTIONS="gaussian_noise shot_noise impulse_noise defocus_blur glass_blur motion_blur zoom_blur snow frost fog brightness contrast elastic_transform pixelate jpeg_compression"
+```
 
-`helpers/0_corrupt_images.py`:
+### 0. Generate the Corrupted Datasets
 
-* crops the clean images;
-* adapts their bounding boxes;
-* generates corrupted images;
-* converts VOC XML annotations to COCO-compatible JSON when necessary.
+`0_corrupt_images.py` crops the clean images, adapts the annotations, and generates the corrupted versions. VOC XML annotations are converted to COCO-compatible JSON.
 
-### COCO-C
+#### COCO-C
 
 ```bash
 python helpers/0_corrupt_images.py \
@@ -330,26 +275,11 @@ python helpers/0_corrupt_images.py \
     filename \
     --annotation-file /path/to/COCO/annotations/instances_val2017.json \
     --output-annotation-file COCO_adapted_annotations.json \
-    -c gaussian_noise shot_noise impulse_noise \
-       defocus_blur glass_blur motion_blur zoom_blur \
-       snow frost fog brightness contrast elastic_transform \
-       pixelate jpeg_compression \
+    -c $CORRUPTIONS \
     -j 8
 ```
 
-Output:
-
-```text
-COCO_C/
-├── cropped_images/
-└── corrupted_images/
-
-COCO_adapted_annotations.json
-```
-
-### VOC-C
-
-For VOC, provide the image directory and the directory containing the XML annotations:
+#### VOC-C
 
 ```bash
 python helpers/0_corrupt_images.py \
@@ -358,35 +288,15 @@ python helpers/0_corrupt_images.py \
     filename \
     --annotation-file /path/to/VOC/Annotations \
     --output-annotation-file VOC_adapted_annotations.json \
-    -c gaussian_noise shot_noise impulse_noise \
-       defocus_blur glass_blur motion_blur zoom_blur \
-       snow frost fog brightness contrast elastic_transform \
-       pixelate jpeg_compression \
+    -c $CORRUPTIONS \
     -j 8
 ```
 
-Output:
+### 1. Compute mAP, DDS and LPIPS
 
-```text
-VOC_C/
-├── cropped_images/
-└── corrupted_images/
+`1_compute_metrics.py` evaluates the clean and corrupted images and stores mAP, AP50, DDS, and LPIPS for each corruption and severity.
 
-VOC_adapted_annotations.json
-```
-
----
-
-## 1. Compute mAP, DDS and LPIPS
-
-`helpers/1_compute_metrics.py` evaluates the detector on the clean and corrupted images and computes:
-
-* mAP;
-* AP50;
-* DDS;
-* LPIPS.
-
-### COCO-C
+#### COCO-C
 
 ```bash
 python helpers/1_compute_metrics.py \
@@ -400,7 +310,7 @@ python helpers/1_compute_metrics.py \
     --device cuda:0
 ```
 
-### VOC-C
+#### VOC-C
 
 ```bash
 python helpers/1_compute_metrics.py \
@@ -414,21 +324,9 @@ python helpers/1_compute_metrics.py \
     --device cuda:0
 ```
 
-The resulting JSON contains the clean detector performance and the results for every corruption/severity pair.
+### 2. Compute Correlations and Plots
 
----
-
-## 2. Compute Correlations and Generate Plots
-
-`helpers/2_compute_correlations.py` reads the JSON generated in the previous step and produces:
-
-* DDS–mAP correlations;
-* LPIPS–mAP correlations;
-* per-corruption correlations;
-* severity plots;
-* comparison plots used for the paper analysis.
-
-Set the input and output paths near the bottom of the script:
+Set the input and output paths in `helpers/2_compute_correlations.py`:
 
 ```python
 input_json = "COCO_results_DDS.json"
@@ -441,46 +339,23 @@ then run:
 python helpers/2_compute_correlations.py
 ```
 
-Repeat with the VOC results:
-
-```python
-input_json = "VOC_results_DDS.json"
-output_dir = Path("plots/VOC")
-```
+Repeat with the corresponding VOC results to reproduce the VOC-C analysis.
 
 ---
 
-# Main Results
+## 📚 Citation
 
-DDS shows a strong relationship with object detection degradation on COCO-C and VOC-C, reaching a correlation with mAP of at least **−0.86** across the evaluated corruption categories.
+The final proceedings citation will be added once available.
 
-DDSRN predicts DDS on held-out KITTI + VisDrone data with:
-
-| Metric |    Result |
-| ------ | --------: |
-| PLCC ↑ |  **0.84** |
-| SRCC ↑ |  **0.72** |
-| MAE ↓  | **0.044** |
-
-The paper further evaluates DDSRN as a restoration objective for super-resolution and low-light image enhancement.
-
-Full experimental results and ablations are reported in the paper.
-
----
-
-# Citation
-
-The final citation and proceedings link will be added after publication.
-
-```bibtex
+<!--```bibtex
 @misc{dani_ddsrn,
     title  = {Novel Task-Driven Loss to Restore Object Detector Performance under Image Degradation},
     author = {Dani, Silvia and Galteri, Leonardo and Bertini, Marco}
 }
 ```
-
+-->
 ---
 
-# License
+## 📄 License
 
 See [LICENSE](LICENSE).
